@@ -14,26 +14,25 @@ public class Program
 
     public async Task HandleCommand(SocketMessage arg)
     {
+        int argPos = 0;
         var message = arg as SocketUserMessage;
         var context = new SocketCommandContext(Client, message);
 
         if (message == null || message.Author.IsBot) return;
-        int argPos = 0;
+        if (!message.HasStringPrefix("!", ref argPos)) return;
 
         string content = message.Content[1..];
+        if (content.Length == 0) return;
 
-        if (message.HasStringPrefix("!", ref argPos) && content.Length > 0)
+        DefinitionsList definitions = await FetchDefinitionFromUD(content);
+        if (definitions.list.Count == 0)
         {
-            DefinitionsList definitions = await FetchDefinitionFromUD(content);
-            if (definitions.list.Count == 0)
-            {
-                await context.Channel.SendMessageAsync($"There are no definitions for word {content}.");
-                return;
-            }
-
-            await context.Channel.SendMessageAsync($"Heres a definition for the word \"{content}\"");
-            await context.Channel.SendMessageAsync($"{definitions.list[0].definition}");
+            await context.Channel.SendMessageAsync($"There are no definitions for word {content}.");
+            return;
         }
+
+        string result = $"Heres the first definition for the word \"{content}\"\n\n{definitions.list[0].definition}";
+        await context.Channel.SendMessageAsync(result);
     }
 
     private static Task Log(LogMessage message)
@@ -66,22 +65,15 @@ public class Program
 
         HttpResponseMessage response = await client.GetAsync(api_path + word);
 
-        if (!response.IsSuccessStatusCode)
-        {
-            return new();
-        }
+        if (!response.IsSuccessStatusCode) return new();
 
         string responseBody = await response.Content.ReadAsStringAsync();
-        if (responseBody != null)
-        {
-            DefinitionsList definitionsList = JsonSerializer.Deserialize<DefinitionsList>(responseBody);
-            if (definitionsList != null)
-            {
-                return definitionsList;
-            }
-        }
+        if (responseBody == null) return new();
 
-        return new();
+        DefinitionsList definitionsList = JsonSerializer.Deserialize<DefinitionsList>(responseBody);
+        if (definitionsList == null) return new();
+
+        return definitionsList;
     }
     public async Task MainAsync()
     {
