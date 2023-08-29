@@ -1,4 +1,4 @@
-public class ConfigurationClass
+public class Configuration
 {
     public string? Token { get; set; }
 }

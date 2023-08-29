@@ -1,7 +1,8 @@
 ﻿using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
-using Newtonsoft.Json;
+//using Newtonsoft.Json;
+using System.Text.Json;
 
 public class Program
 {
@@ -22,7 +23,17 @@ public class Program
         string content = message.Content[1..];
 
         if (message.HasStringPrefix("!", ref argPos) && content.Length > 0)
-            await context.Channel.SendMessageAsync($"You entered the command \"{content.ToLower()}\"");
+        {
+            DefinitionsList definitions = await FetchDefinitionFromUD(content);
+            if (definitions.list.Count == 0)
+            {
+                await context.Channel.SendMessageAsync($"There are no definitions for word {content}.");
+                return;
+            }
+
+            await context.Channel.SendMessageAsync($"Heres a definition for the word \"{content}\"");
+            await context.Channel.SendMessageAsync($"{definitions.list[0].definition}");
+        }
     }
 
     private static Task Log(LogMessage message)
@@ -49,7 +60,7 @@ public class Program
         return Task.CompletedTask;
     }
 
-    public async Task<string> FetchDefinitionFromUD(string word)
+    public async Task<DefinitionsList> FetchDefinitionFromUD(string word)
     {
         using HttpClient client = new();
 
@@ -57,11 +68,20 @@ public class Program
 
         if (!response.IsSuccessStatusCode)
         {
-            return $"Error: {response.StatusCode}";
+            return new();
         }
 
         string responseBody = await response.Content.ReadAsStringAsync();
-        return responseBody;
+        if (responseBody != null)
+        {
+            DefinitionsList definitionsList = JsonSerializer.Deserialize<DefinitionsList>(responseBody);
+            if (definitionsList != null)
+            {
+                return definitionsList;
+            }
+        }
+
+        return new();
     }
     public async Task MainAsync()
     {
@@ -81,7 +101,7 @@ public class Program
         Client.MessageReceived += HandleCommand;
         Commands.Log += Log;
 
-        var token = JsonConvert.DeserializeObject<ConfigurationClass>(File.ReadAllText("config.json"))?.Token;
+        var token = JsonSerializer.Deserialize<Configuration>(File.ReadAllText("config.json"))?.Token;
         await Client.LoginAsync(TokenType.Bot, token);
         await Client.StartAsync();
 
