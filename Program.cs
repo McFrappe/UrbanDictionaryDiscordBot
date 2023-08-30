@@ -34,7 +34,7 @@ public class Program
         }
 
         string result = $"Heres the first definition for the word \"{definitions.list[0].word}\"";
-        result += $"\n\n{definitions.list[0].definition}\n\n\n";
+        result += $"\n\n{definitions.list[0].definition}\n\n";
         result += $"It can be used in the following context:\n\n{definitions.list[0].example}";
         await context.Channel.SendMessageAsync(result);
     }
