@@ -1,12 +1,11 @@
 ﻿using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
-//using Newtonsoft.Json;
 using System.Text.Json;
 
 public class Program
 {
-    public static Task Main(string[] args) => new Program().MainAsync();
+    public static Task Main() => new Program().MainAsync();
 
     private DiscordSocketClient? Client;
     private CommandService? Commands;
@@ -21,17 +20,22 @@ public class Program
         if (message == null || message.Author.IsBot) return;
         if (!message.HasStringPrefix("!", ref argPos)) return;
 
-        string content = message.Content[1..];
+        string command = message.Content[1..5];
+        if (!String.Equals(command, "word")) return;
+
+        string content = message.Content[6..];
         if (content.Length == 0) return;
 
         DefinitionsList definitions = await FetchDefinitionFromUD(content);
         if (definitions.list.Count == 0)
         {
-            await context.Channel.SendMessageAsync($"There are no definitions for word {content}.");
+            await context.Channel.SendMessageAsync($"There are no definitions for word \"{content}\".");
             return;
         }
 
-        string result = $"Heres the first definition for the word \"{content}\"\n\n{definitions.list[0].definition}";
+        string result = $"Heres the first definition for the word \"{definitions.list[0].word}\"";
+        result += $"\n\n{definitions.list[0].definition}\n\n\n";
+        result += $"It can be used in the following context:\n\n{definitions.list[0].example}";
         await context.Channel.SendMessageAsync(result);
     }
 
@@ -62,9 +66,7 @@ public class Program
     public async Task<DefinitionsList> FetchDefinitionFromUD(string word)
     {
         using HttpClient client = new();
-
         HttpResponseMessage response = await client.GetAsync(api_path + word);
-
         if (!response.IsSuccessStatusCode) return new();
 
         string responseBody = await response.Content.ReadAsStringAsync();
@@ -75,6 +77,7 @@ public class Program
 
         return definitionsList;
     }
+
     public async Task MainAsync()
     {
         Client = new DiscordSocketClient(new DiscordSocketConfig
@@ -93,7 +96,10 @@ public class Program
         Client.MessageReceived += HandleCommand;
         Commands.Log += Log;
 
-        var token = JsonSerializer.Deserialize<Configuration>(File.ReadAllText("config.json"))?.Token;
+        // Get the path to the project root by going up two levels from the executable location
+        string projectRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", ".."));
+        string configFilePath = Path.Combine(projectRoot, "config.json");
+        var token = JsonSerializer.Deserialize<Configuration>(File.ReadAllText(configFilePath))?.Token;
         await Client.LoginAsync(TokenType.Bot, token);
         await Client.StartAsync();
 
